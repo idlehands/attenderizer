@@ -1,3 +1,5 @@
+require 'twilio-ruby'
+
 class EventsController < ApplicationController
   before_action :set_event, only: [:show, :edit, :update, :destroy]
 
@@ -27,10 +29,28 @@ class EventsController < ApplicationController
   # POST /events
   # POST /events.json
   def create
+    account_sid = 'ACfc43e6bc0fee75b8532b7ddedba5092e'
+    auth_token = '9c181533ebcb67f175a4efd4cd24e000'
     @event = Event.new(event_params)
     if params["invited"]
       invited_ids = params["invited"].map {|id_string| id_string.to_i}
       @event.guest_ids = invited_ids
+      fmt_date = @event.date.strftime("%m/%d/%Y at %I:%M%p")
+
+      @event.guest_ids.each do |guest_id|
+        guest = Guest.find_by(id: guest_id)
+        begin
+          @client = Twilio::REST::Client.new account_sid, auth_token
+          @client.account.messages.create({
+              :from => '+13039744720',
+              :to => "+1#{guest.phonenumber}",
+              :body => "#{guest.name}, You have been invited to #{@event.details} "\
+                "on #{fmt_date}. Please reply 'yes' or 'no' to RSVP."
+          })
+        rescue Twilio::REST::RequestError => e
+          puts e.message
+        end
+      end
     end
 
     respond_to do |format|
